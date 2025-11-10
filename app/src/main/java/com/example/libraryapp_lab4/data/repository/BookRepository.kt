@@ -133,7 +133,7 @@ class BookRepository @Inject constructor() {
     /**
      * Returnează lista completă de cărți.
      */
-    fun getAllBooks(): List<Book> {
+    suspend fun getAllBooks(): List<Book> {
         return books
     }
 

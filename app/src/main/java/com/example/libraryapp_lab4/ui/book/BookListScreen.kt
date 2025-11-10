@@ -6,15 +6,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.libraryapp_lab4.data.model.Book
 
 /**
@@ -33,14 +37,43 @@ fun BookListScreen(
     // `collectAsState` transformă un Flow într-un State<T> pe care Compose îl poate observa.
     // Când valoarea din viewModel.books se schimbă, această variabilă se va actualiza
     // și Composable-ul se va recompune automat.
-    val books by viewModel.books.collectAsState()
+    val uiState by viewModel.booksUiState.collectAsStateWithLifecycle()
 
-    LazyColumn(
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(books) { book ->
-            BookCard(book = book, onClick = { onBookClick(book.id) })
+    when (val state = uiState) {
+        is BooksUiState.Loading -> {
+            // Afișăm un indicator de progres în centrul ecranului
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+        is BooksUiState.Success -> {
+            // Afișăm lista de cărți
+            LazyColumn(
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(state.books) { book ->
+                    BookCard(book = book, onClick = { onBookClick(book.id) })
+                }
+            }
+        }
+        is BooksUiState.Error -> {
+            // Afișăm mesajul de eroare
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = state.message,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }

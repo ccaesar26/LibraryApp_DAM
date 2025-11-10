@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.devtools.ksp)
     alias(libs.plugins.dagger.hilt.android)
+    alias(libs.plugins.kotlinx.serialization)
 }
 
 android {
@@ -64,4 +65,11 @@ dependencies {
 
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
+
+    // Ktor
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.cio) // Motorul Ktor (Coroutine-based I/O)
+    implementation(libs.ktor.client.content.negotiation) // Plugin pentru JSON
+    implementation(libs.ktor.serialization.kotlinx.json) // Serializatorul JSON
+    implementation(libs.ktor.client.logging) // Plugin pentru logging-ul request-urilor
 }

@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.net.UnknownHostException
 import javax.inject.Inject
 
 /**
@@ -22,13 +23,8 @@ class BookViewModel @Inject constructor(
     private val repository: BookRepository
 ) : ViewModel() {
 
-    // --- Starea pentru Lista de Cărți ---
-
-    // [INTERN] Starea mutabilă. Poate fi modificată doar din interiorul ViewModel-ului.
-    private val _books = MutableStateFlow<List<Book>>(emptyList())
-
-    // [PUBLIC] Starea imutabilă, expusă către UI. UI-ul doar o poate citi/observa.
-    val books: StateFlow<List<Book>> = _books.asStateFlow()
+    private val _booksUiState = MutableStateFlow<BooksUiState>(BooksUiState.Loading)
+    val booksUiState: StateFlow<BooksUiState> = _booksUiState.asStateFlow()
 
     // --- Starea pentru Cartea Selectată (Ecranul de Detalii) ---
 
@@ -52,10 +48,24 @@ class BookViewModel @Inject constructor(
      * Chiar dacă acum este o operație sincronă, folosim un model pregătit pentru asincron.
      */
     private fun loadBooks() {
-        // Într-o aplicație reală, repository.getAllBooks() ar fi o funcție `suspend`
-        // și am rula-o într-un anume Dispatcher (ex: Dispatchers.IO).
         viewModelScope.launch {
-            _books.value = repository.getAllBooks()
+            // 1. Emitem imediat starea de Loading
+            _booksUiState.value = BooksUiState.Loading
+            try {
+                // 2. Apelăm repository-ul
+                val books = repository.getAllBooks()
+
+                // 3. Emitem starea de Success dacă totul a mers bine
+                _booksUiState.value = BooksUiState.Success(books)
+            } catch (e: UnknownHostException) {
+                // 4. Prindem excepții specifice pentru mesaje de eroare clare
+                _booksUiState.value =
+                    BooksUiState.Error("No internet connection. Please check your settings.")
+            } catch (e: Exception) {
+                // Prindem orice altă excepție
+                _booksUiState.value =
+                    BooksUiState.Error("An unexpected error occurred: ${e.message}")
+            }
         }
     }
 
@@ -67,7 +77,13 @@ class BookViewModel @Inject constructor(
      */
     fun loadBookById(id: Int) {
         viewModelScope.launch {
-            _selectedBook.value = repository.getBookById(id)
+            try {
+                val book = repository.getBookById(id)
+                _selectedBook.value = book
+            } catch (_: Exception) {
+                // Aici am putea gestiona erorile specifice pentru încărcarea unei singure cărți
+                _selectedBook.value = null // Sau putem păstra valoarea anterioară
+            }
         }
     }
 }

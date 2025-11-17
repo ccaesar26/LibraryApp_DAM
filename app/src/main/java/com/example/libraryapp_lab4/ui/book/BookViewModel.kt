@@ -8,6 +8,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import java.net.UnknownHostException
 import javax.inject.Inject
@@ -40,31 +41,56 @@ class BookViewModel @Inject constructor(
      * Aici inițiem încărcarea listei de cărți.
      */
     init {
-        loadBooks()
+        // La inițializarea ViewModel-ului, facem două lucruri în paralel:
+        // 1. Începem să observăm baza de date pentru orice modificări.
+        observeBooks()
+        // 2. Declanșăm o reîmprospătare a datelor de la rețea.
+        refreshBooks()
     }
 
     /**
-     * Încarcă lista de cărți din repository și actualizează starea `_books`.
-     * Chiar dacă acum este o operație sincronă, folosim un model pregătit pentru asincron.
+     * Observă încontinuu sursa unică a adevărului (baza de date).
+     * De fiecare dată când datele din DB se schimbă, acest bloc va emite
+     * o nouă stare de Succes către UI.
      */
-    private fun loadBooks() {
+    private fun observeBooks() {
         viewModelScope.launch {
-            // 1. Emitem imediat starea de Loading
-            _booksUiState.value = BooksUiState.Loading
-            try {
-                // 2. Apelăm repository-ul
-                val books = repository.getAllBooks()
+            repository.getAllBooks()
+                // În caz de eroare la citirea din DB (rar, dar posibil)
+                .catch { e ->
+                    _booksUiState.value = BooksUiState.Error("Failed to load data from local database.")
+                }
+                .collect { books ->
+                    // Transformăm lista de cărți primită de la DB într-o stare de Succes.
+                    _booksUiState.value = BooksUiState.Success(books)
+                }
+        }
+    }
 
-                // 3. Emitem starea de Success dacă totul a mers bine
-                _booksUiState.value = BooksUiState.Success(books)
+    /**
+     * Declanșează o acțiune de reîmprospătare a datelor de la rețea.
+     * Gestionează stările de Loading și Error.
+     */
+    private fun refreshBooks() {
+        viewModelScope.launch {
+            try {
+                // Setăm starea de Loading DOAR dacă nu avem deja date afișate.
+                // Astfel evităm un flicker al UI-ului la reîmprospătări de fundal.
+                if (_booksUiState.value !is BooksUiState.Success) {
+                    _booksUiState.value = BooksUiState.Loading
+                }
+
+                // Apelăm funcția suspend din repository pentru a aduce datele noi.
+                repository.refreshBooks()
+                // NU setăm starea de Succes aici. `observeBooks` se va ocupa de asta
+                // automat, odată ce noile date sunt scrise în baza de date.
             } catch (e: UnknownHostException) {
-                // 4. Prindem excepții specifice pentru mesaje de eroare clare
-                _booksUiState.value =
-                    BooksUiState.Error("No internet connection. Please check your settings.")
+                // Dacă nu există conexiune, setăm o eroare specifică.
+                // UI-ul va continua să afișeze datele vechi din DB, dacă există.
+                _booksUiState.value = BooksUiState.Error("No internet connection. Please check your settings.")
             } catch (e: Exception) {
-                // Prindem orice altă excepție
-                _booksUiState.value =
-                    BooksUiState.Error("An unexpected error occurred: ${e.message}")
+                // Pentru orice altă eroare de rețea.
+                _booksUiState.value = BooksUiState.Error("An unexpected error occurred: ${e.message}")
             }
         }
     }

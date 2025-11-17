@@ -72,4 +72,10 @@ dependencies {
     implementation(libs.ktor.client.content.negotiation) // Plugin pentru JSON
     implementation(libs.ktor.serialization.kotlinx.json) // Serializatorul JSON
     implementation(libs.ktor.client.logging) // Plugin pentru logging-ul request-urilor
+
+    // Room
+    implementation(libs.androidx.room.runtime)
+    ksp(libs.androidx.room.compiler)
+    implementation(libs.androidx.room.ktx)
+    androidTestImplementation(libs.androidx.room.testing)
 }
